@@ -1,25 +1,48 @@
+import itertools
+import timeit
+from heapq import nlargest
+from random import randint, shuffle
+from typing import List, Tuple
+
+
+def k_max(arr: List[List[int]], col: int, k: int):
+    heap = [(x[col], i) for i, x in enumerate(arr)]
+    return list(map(lambda x: x[1], nlargest(k, heap)))
+
+
 def main():
     n = int(input())
-    g = []
+    arr: List[List[int]] = []
+    m: List[int] = []
+    has_values = [False for _ in range(3)]  # stores info if there is any non-zero value in each column
+    # read input
     for i in range(n):
-        g.append(list(map(int, input().split(' '))))
-    cost_tab = []
-    for row in g:
-        cost_tab.append([row[1] + row[2], row[0] + row[2], row[0] + row[1]])
-    global_g = [(0, -1) for _ in range(3)]
+        row = list(map(int, input().split(" ")))  # read row
+        m.append(max(row))  # add max value
+        arr.append(row)  # add row to array
+        for j, value in enumerate(row):  # check if any value is 0 for each column
+            has_values[j] |= value != 0
+    initial_cost = 0
+    # calculate initial cost if only max values would stay at each row
     for i in range(n):
-        for g_id, (current, (glob_max, glob_i)) in enumerate(zip(g[i], global_g)):
-            if current > glob_max:
-                global_g[g_id] = (current, i)
-    forbidden_indices = list(map(lambda x: x[1], global_g))
-    ans = 0
-    for i in range(n):
-        if i in forbidden_indices:
-            pos = forbidden_indices.index(i)
-            ans += cost_tab[i][pos]
-        else:
-            ans += min(cost_tab[i])
-    print(ans)
+        for j in range(3):
+            initial_cost += arr[i][j]
+        initial_cost -= m[i]
+    min_cost = float("inf")
+    # find indices of max values in each column
+    max_values = [k_max(arr, i, 3) for i in range(3)]
+    # check every permutation of column indices to choose best rows
+    for rows_ids in itertools.product(*max_values):
+        if len(set(rows_ids)) != 3:  # if rows indices are distinct
+            continue
+        # calculate new cost if rows indices would be chosen
+        new_cost = initial_cost
+        for i, row_id in enumerate(rows_ids):
+            if has_values[i]:
+                new_cost += m[row_id] - arr[row_id][i] # minus max values, plus chosen column
+        if min_cost > new_cost:  # save cost if minimal
+            min_cost = new_cost
+    print(min_cost)
 
 
 if __name__ == '__main__':
