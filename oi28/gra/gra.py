@@ -12,12 +12,12 @@ def zero_one_bfs(n: int, x: int):
         q.append(node)
         dist[node] = 0
     while q:
-        current = q.pop()
+        current = q.popleft()
         for (neighbour, weight) in inv_graph[current]:
             if dist[current] + weight < dist[neighbour]:
                 dist[neighbour] = dist[current] + weight
                 if weight == 0:
-                    q.insert(0, neighbour)
+                    q.appendleft(neighbour)
                 else:
                     q.append(neighbour)
     return dist
@@ -66,6 +66,7 @@ def main():
     for node, neighbours in graph.items():
         for neighbour, weight in neighbours:
             inv_graph[neighbour].append((node, weight))
+    graph.clear()
     # precalculate distances
     distances = zero_one_bfs(n, x)
     # answer questions
