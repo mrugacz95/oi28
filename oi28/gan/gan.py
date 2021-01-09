@@ -1,4 +1,5 @@
 from collections import defaultdict, deque
+from math import sqrt, floor
 from typing import Tuple, List, Optional, Set
 
 
@@ -24,7 +25,7 @@ class State:
 
 counter = 0
 tree = defaultdict(list)
-dfs_order: List[Tuple[int, bool]] = []  # 0(2n) memory, we can afford it
+dfs_order: List[Tuple[int, bool]] = []
 preorder: List[Optional[int]]
 parent: List[int]
 
@@ -33,14 +34,14 @@ def get_edge(current_node, next_node) -> Tuple[int, int]:
     return (next_node, current_node) if next_node < current_node else (current_node, next_node)
 
 
-def dfs(start_node: int): # we need iterative version as recursive version throws RecursionError :<
+def dfs(start_node: int):  # we need iterative version as recursive version throws RecursionError :<
     global counter, dfs_order
-    q = deque([0])
+    q = deque([start_node])
     while len(q) != 0:
         node = q.popleft()
         if preorder[node] == -1:  # not visited
-            q.appendleft(node) # add again to calculate exit time
-            dfs_order.append((node, True))  # enter node
+            q.appendleft(node)  # add again to calculate exit time
+            dfs_order[counter] = (node, True)  # enter node
             preorder[node] = counter  # store preorder
             counter += 1
             for neighbour in tree[node]:
@@ -48,9 +49,8 @@ def dfs(start_node: int): # we need iterative version as recursive version throw
                     parent[neighbour] = node  # mark parent
                     q.appendleft(neighbour)
         else:
-            dfs_order.append((node, False))  # exit node
+            dfs_order[counter] = (node, False)  # exit node
             counter += 1
-
 
 
 def edge_in_path(edge: Tuple[int, int], path: Set[int]) -> bool:
@@ -89,10 +89,11 @@ def main():
             edges_content[edge] = next_mascot
 
     # init arrays
-    global preorder, parent
+    global preorder, parent, dfs_order
     preorder = [-1] * n
     parent = [0] * n
     parent[0] = 0
+    dfs_order = [(-1, False)] * (2 * n)  # 0(2n) memory, we can afford it, but we need to preallocate it
     # assign node ids, determine parent
     dfs(0)
 
@@ -118,8 +119,15 @@ def main():
         current_path.remove(current_node)
         current_node = parent[current_node]
 
-    answers: List[int] = []
-    for qt, qv in queries:
+    # sort queries
+    sqrt_n = sqrt(n)
+    # as current tree state is in last time stamp, we will sort by -t/sqrt_n
+    ordered_queries = map(lambda x: x[2], sorted((-floor(q_t / sqrt_n), q_v, q_idx)
+                                                 for q_idx, (q_t, q_v) in enumerate(queries)))
+
+    answers: List[int] = [0] * len(queries)  # init answers array as result will be calculated out of order
+    for q_idx in ordered_queries:
+        qt, qv = queries[q_idx]
         while current_t < qt:  # shift state to future time
             edge_id, prev_mascot, next_mascot = changes[current_t]  # change mascot prev -> next on edge
             edge = edges[edge_id]
@@ -150,7 +158,7 @@ def main():
             else:
                 add_node_to_path(last_node)
             current_v -= 1
-        answers.append(state.size)
+        answers[q_idx] = state.size  # store number of distinct mascots in path
     for answer in answers:
         print(answer)
 
