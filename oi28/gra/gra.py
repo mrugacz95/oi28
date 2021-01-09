@@ -1,60 +1,77 @@
-from collections import defaultdict
+from collections import defaultdict, deque
 
 graph = defaultdict(list)
-
-n, x, z = 0, 0, 0
-
-
-def find_next(from_node, lvl):
-    closest = x
-    # connect all on one lvl
-    for (s_lvl, s_pos), neighbours in graph.items():
-        if lvl == s_lvl and from_node < s_pos < closest:
-            closest = s_pos
-    return closest
+inv_graph = defaultdict(list)
 
 
-def dfs(start_node):
-    q = [n for n in graph[start_node]]
-    visited = set()
-    min_c = float('inf')
+def zero_one_bfs(n: int, x: int):
+    dist = defaultdict(lambda: float('inf'))
+    q = deque()
+    for i in range(1, n + 1):
+        node = (i, x)
+        q.append(node)
+        dist[node] = 0
     while q:
-        c_y, c_x, c_c = q.pop(0)
-        if c_x == x:
-            min_c = min(c_c, min_c)
-        if (c_y, c_x) in visited:
-            continue
-        visited.add((c_y, c_x))
-        for n_y, n_x, n_c in graph[(c_y, c_x)]:
-            q.append((n_y, n_x, n_c + c_c))
-    return min_c
+        current = q.pop()
+        for (neighbour, weight) in inv_graph[current]:
+            if dist[current] + weight < dist[neighbour]:
+                dist[neighbour] = dist[current] + weight
+                if weight == 0:
+                    q.insert(0, neighbour)
+                else:
+                    q.append(neighbour)
+    return dist
+
+
+def read_ints():
+    return list(map(int, input().split(' ')))
 
 
 def main():
-    global n, x, z
-    n, x, z = map(int, input().split(' '))
-    for lvl in range(n):
-        holes = list(map(lambda  x: int(x)-1, input().split(' ')))
-        holes.pop(0)
-        for h in holes:
-            graph[(lvl, h - 1)].append((lvl + 1, h, 0))  # fall
-            graph[(lvl + 1, h)].append((lvl, h + 1, 1))  # jump up
-            graph[(lvl, h - 1)].append((lvl, h + 1, 1))  # jump over
-            if (lvl, h + 1) not in graph and h + 1 != x:
-                graph[(lvl, h + 1)] = []
-            if (lvl + 1, h) not in graph:
-                graph[(lvl + 1, h)] = []
-    for lvl in range(n):
-        next_node = 0
-        from_node = 0
-        while from_node != x:
-            next_node = find_next(next_node, lvl)
-            if (lvl, next_node) not in graph[(lvl, from_node)]:
-                graph[(lvl, from_node)].append((lvl, next_node, 0))
-            from_node = next_node
-    for _ in range(z):
-        start_pos = int(input())
-        print(dfs((start_pos - 1, 0)))
+    n, x, z = read_ints()
+    previous = []
+    # build graph
+    for lvl in range(1, n + 1):
+        current = read_ints()[1:]  # read current holes
+        last_node = (lvl, 1)
+        ci = 0
+        pi = 0
+        # join holes from current and last platform with two pointers
+        for _ in range(len(previous) + len(current)):
+            if pi == len(previous) or (ci < len(current)
+                                       and current[ci] < previous[pi]):  # choose hole from current platform
+                next_hole = current[ci]
+                ci += 1
+                from_current = True
+            else:  # choose hole from previous platform
+                next_hole = previous[pi]
+                pi += 1
+                from_current = False
+            if from_current:  # hole is on current platform
+                after_hole = (lvl, next_hole + 1)
+                below_hole = (lvl + 1, next_hole)
+                graph[last_node].append((after_hole, 1))
+                graph[last_node].append((below_hole, 0))
+                last_node = after_hole
+            else:  # hole is above current platform
+                below_hole = (lvl, next_hole)
+                after_hole = (lvl - 1, next_hole + 1)
+                graph[last_node].append((below_hole, 0))
+                graph[last_node].append((after_hole, 1))
+                last_node = below_hole
+        if last_node[1] != x:  # if last node is not utmost
+            graph[last_node].append(((lvl, x), 0))
+        previous = current  # move holes from current platform to previous platform
+    # invert graph
+    for node, neighbours in graph.items():
+        for neighbour, weight in neighbours:
+            inv_graph[neighbour].append((node, weight))
+    # precalculate distances
+    distances = zero_one_bfs(n, x)
+    # answer questions
+    for i in range(z):
+        lvl = int(input())
+        print(distances[(lvl, 1)])
 
 
 if __name__ == '__main__':
