@@ -1,5 +1,5 @@
 from collections import defaultdict, deque
-from typing import Tuple, List, Dict, Optional, Set
+from typing import Tuple, List, Optional, Set
 
 
 def read_ints():
@@ -33,17 +33,24 @@ def get_edge(current_node, next_node) -> Tuple[int, int]:
     return (next_node, current_node) if next_node < current_node else (current_node, next_node)
 
 
-def dfs(node: int):
+def dfs(start_node: int): # we need iterative version as recursive version throws RecursionError :<
     global counter, dfs_order
-    dfs_order.append((node, True))  # enter node
-    preorder[node] = counter # store preorder
-    counter += 1
-    for neighbour in tree[node]:
-        if preorder[neighbour] == -1:  # not visited yet
-            parent[neighbour] = node # mark parent
-            dfs(neighbour)
-    counter += 1
-    dfs_order.append((node, False))  # exit node
+    q = deque([0])
+    while len(q) != 0:
+        node = q.popleft()
+        if preorder[node] == -1:  # not visited
+            q.appendleft(node) # add again to calculate exit time
+            dfs_order.append((node, True))  # enter node
+            preorder[node] = counter  # store preorder
+            counter += 1
+            for neighbour in tree[node]:
+                if preorder[neighbour] == -1:  # not visited yet
+                    parent[neighbour] = node  # mark parent
+                    q.appendleft(neighbour)
+        else:
+            dfs_order.append((node, False))  # exit node
+            counter += 1
+
 
 
 def edge_in_path(edge: Tuple[int, int], path: Set[int]) -> bool:
