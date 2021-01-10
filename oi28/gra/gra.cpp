@@ -3,124 +3,181 @@
 #include <vector>
 #include <algorithm>
 #include <queue>
-#include <fstream>
+#include <unordered_set>
+#include <unordered_map>
 using namespace std;
 
 int holes1Count, holes2Count;
-int holes[2][1000000];
 int lastHoles = 1;
 int n, m, z;
 
-class Edge
+// class Edge
+// {
+// public:
+//   pair<int, int> target;
+//   short weight;
+
+//   Edge(pair<int, int> t, short w) : target(t), weight(w) {}
+// };
+
+// struct hash_pair
+// {
+//   template <class T1, class T2>
+//   size_t operator()(const pair<T1, T2> &p) const
+//   {
+//     auto hash1 = hash<T1>{}(p.first);
+//     auto hash2 = hash<T2>{}(p.second);
+//     return hash1 ^ hash2;
+//   }
+// };
+
+typedef pair<int, int> pii;
+
+unordered_map<int, vector<pair<int, int>>> g;
+unordered_map<int, vector<pair<int,int>>> inv_g;
+unordered_map<int, int> dist;
+
+int node_to_id(int i, int x)
 {
-public:
-  pair<int, int> target;
-  short weight;
+  return i * (m+ 1) + x;
+}
 
-  Edge(pair<int, int> t, short w) : target(t), weight(w) {}
-};
-
-map<pair<int, int>, vector<Edge>> g;
-
-void mergeHoles(int platformId)
+pii id_to_node(int id)
 {
-  pair<int, int> lastNode = make_pair(platformId, 0);
-  int i1 = 0, i2 = 0, nextVal = 0, source = -1;
+  return {id / (m+1), id % (m+1)};
+}
 
-  for (int i = 0; i < holes1Count + holes2Count; i++)
+void mergeHoles(int platformId, vector<int> *lastHoles, vector<int> *currentHoles)
+{
+  int lastNode = node_to_id(platformId, 1); // begin with leftmost node
+  int lastIt = 0,                           // last platform holes iterator
+      currIt = 0,                           // current platform holes iterator
+      nextVal;
+  bool fromCurrent;
+  // cout << "platform " << platformId << "\n";
+  for (int i = 0; i < lastHoles->size() + currentHoles->size(); i++)
   {
-    if ((i1 >= holes1Count) || (holes[0][i1] < holes[1][i2]))
+    if ((lastIt == lastHoles->size()) || (currIt < currentHoles->size() && currentHoles->at(currIt) < lastHoles->at(lastIt)))
     {
-      nextVal = holes[0][i2];
-      source = 0;
-      i1++;
+      nextVal = currentHoles->at(currIt);
+      fromCurrent = true;
+      currIt++;
     }
     else
     {
-      nextVal = holes[1][i2];
-      source = 1;
-      i2++;
+      nextVal = lastHoles->at(lastIt);
+      fromCurrent = false;
+      lastIt++;
     }
+    // cout << "next val:" << nextVal << "\n";
     // Add next node
-    pair<int, int> nextNode;
-    if (lastHoles - 1 == source) // hole on current platform
+    if (fromCurrent) // hole on current platform
     {
-      nextNode = make_pair(platformId, nextVal - 1);
-      g[lastNode].push_back(Edge(nextNode, 1));
-      lastNode = nextNode;
-      nextNode = make_pair(platformId, nextVal + 1);
+      int afterHole = node_to_id(platformId, nextVal + 1); // node after hole
+      int belowHole = node_to_id(platformId + 1, nextVal); // node after hole
+      g[lastNode].push_back({afterHole, 1});
+      g[lastNode].push_back({belowHole, 0});
+      lastNode = afterHole;
     }
     else // hole is in celling of current platform
     {
-      pair<int, int> upperBeforeHole = make_pair(platformId - 1, nextVal - 1);
-      pair<int, int> upperAfterHole = make_pair(platformId - 1, nextVal + 1);
-      nextNode = make_pair(platformId, nextVal);
-      g[upperBeforeHole].push_back(Edge(nextNode, 0));
-      g[nextNode].push_back(Edge(upperAfterHole, 1));
-      lastNode = nextNode;
+      int upperAfterHole = node_to_id(platformId - 1, nextVal + 1);
+      int underHole = node_to_id(platformId, nextVal);
+      g[lastNode].push_back({upperAfterHole, 1});
+      if (lastNode != underHole)
+      {
+        g[lastNode].push_back({underHole, 0});
+      }
+      lastNode = underHole;
     }
-    lastNode = nextNode;
+  }
+  if (id_to_node(lastNode).second != m)
+  {
+    int finalNode = node_to_id(platformId, m);
+    g[lastNode].push_back({finalNode, 0});
   }
 }
-class CompareDist
-{
-public:
-  const bool operator()(pair<int, pair<int, int>> lhs, pair<int, pair<int, int>> rhs)
-  {
-    return lhs.first < rhs.first;
-  }
-};
 
-int dijkstra(int startPlatform)
+void zero_one_bfs()
 {
-  priority_queue<pair<int, pair<int, int>>> q;
-  map<int, pair<int, int>> dist;
-  q.push(make_pair(0, make_pair(startPlatform, 0)));
+  deque<int> q;
+  for (int i = 1; i <= n; i++)
+  {
+    auto node = node_to_id(i, m);
+    q.push_back(node);
+    dist[node] = 0;
+  }
+  // cout << "q size " << q.size() << "\n";
+  // unordered_set<pair<int, int>, hash_pair> visited;
   while (!q.empty())
   {
-    pair<int, pair<int, int>> current = q.top();
-    q.pop();
-    pair<int, int> node = current.second;
-    int dist = current.first;
-    for (auto edge : g[node])
+    int current = q.front();
+    q.pop_front();
+
+    // visited.insert(current);
+    // cout <<  "current " << current.first << " " << current.second << "\n";
+    // cout << "curr dist: " << dist[current] << "\n";
+    for (pii edge : inv_g[current])
     {
-      if (edge.target.second == m - 1)
+      // if(visited.find(edge.target) != visited.end()){
+      //   continue;
+      // }
+      if (dist.find(edge.first) == dist.end() || dist[current] + edge.second < dist[edge.first])
       {
-        return dist;
+
+        dist[edge.first] = dist[current] + edge.second;
+        if (edge.second == 0)
+        {
+          q.push_front(edge.first);
+        }
+        else
+        {
+          q.push_back(edge.first);
+        }
       }
-      q.push(make_pair(dist + edge.weight, edge.target));
     }
   }
-  return -1;
 }
 
 int main(int argc, char const *argv[])
 {
   cin >> n >> m >> z;
-  for (int i = 0; i < n; i++)
+  vector<int> *lastHoles = new vector<int>;
+  vector<int> *currentHoles;
+  for (int platform = 1; platform <= n; platform++)
   {
-    int k, h;
-    if (lastHoles == 1)
-    {
-      cin >> holes1Count;
-    }
-    else
-    {
-      cin >> holes2Count;
-    }
-
+    int k, hole;
+    cin >> k;
+    currentHoles = new vector<int>(k);
     for (int j = 0; j < k; j++)
     {
-      cin >> holes[lastHoles - 1][j];
+      cin >> hole;
+      (*currentHoles)[j] = hole;
     }
-    lastHoles = (lastHoles == 1) ? 2 : 1;
-    mergeHoles(i);
+    mergeHoles(platform, lastHoles, currentHoles);
+    lastHoles->clear();
+    delete lastHoles;
+    lastHoles = currentHoles;
   }
+  delete currentHoles;
+  for (auto el : g)
+  {
+    for (pii node : el.second)
+    {
+      // cout << "from " << el.first.first << "," << el.first.second << " to " << node.target.first << ", " << node.target.second << " w: " << node.weight << "\n";
+      inv_g[node.first].push_back({el.first, node.second});
+    }
+  }
+  g.clear();
+
+  zero_one_bfs();
+
   for (int i = 0; i < z; i++)
   {
-    int p;
-    cin >> p;
-    cout << dijkstra(p - 1) << "\n";
+    int platform;
+    cin >> platform;
+    cout << dist[node_to_id(platform, 1)] << "\n";
   }
+
   return 0;
 }
