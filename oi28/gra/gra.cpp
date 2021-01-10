@@ -96,30 +96,22 @@ int dijkstra(int startPlatform)
 
 int main(int argc, char const *argv[])
 {
-  cout << "Bello\n";
-  fstream input;
-  input.open(argv[1]);
-  if (!input.is_open())
-  {
-    cout << "File not found";
-    return 0;
-  }
-  input >> n >> m >> z;
+  cin >> n >> m >> z;
   for (int i = 0; i < n; i++)
   {
     int k, h;
     if (lastHoles == 1)
     {
-      input >> holes1Count;
+      cin >> holes1Count;
     }
     else
     {
-      input >> holes2Count;
+      cin >> holes2Count;
     }
 
     for (int j = 0; j < k; j++)
     {
-      input >> holes[lastHoles - 1][j];
+      cin >> holes[lastHoles - 1][j];
     }
     lastHoles = (lastHoles == 1) ? 2 : 1;
     mergeHoles(i);
@@ -127,7 +119,7 @@ int main(int argc, char const *argv[])
   for (int i = 0; i < z; i++)
   {
     int p;
-    input >> p;
+    cin >> p;
     cout << dijkstra(p - 1) << "\n";
   }
   return 0;
