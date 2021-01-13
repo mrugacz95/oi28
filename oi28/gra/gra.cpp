@@ -1,138 +1,93 @@
 #include <iostream>
 #include <map>
 #include <vector>
-#include <algorithm>
 #include <queue>
-#include <unordered_set>
-#include <unordered_map>
 using namespace std;
-
-int holes1Count, holes2Count;
-int lastHoles = 1;
-int n, m, z;
-
-// class Edge
-// {
-// public:
-//   pair<int, int> target;
-//   short weight;
-
-//   Edge(pair<int, int> t, short w) : target(t), weight(w) {}
-// };
-
-// struct hash_pair
-// {
-//   template <class T1, class T2>
-//   size_t operator()(const pair<T1, T2> &p) const
-//   {
-//     auto hash1 = hash<T1>{}(p.first);
-//     auto hash2 = hash<T2>{}(p.second);
-//     return hash1 ^ hash2;
-//   }
-// };
 
 typedef pair<int, int> pii;
 
-unordered_map<int, vector<pair<int, int>>> g;
-unordered_map<int, vector<pair<int,int>>> inv_g;
-unordered_map<int, int> dist;
+int n, m, z;
 
-int node_to_id(int i, int x)
+struct Edge
 {
-  return i * (m+ 1) + x;
-}
+  int target;
+  char weight;
+};
 
-pii id_to_node(int id)
-{
-  return {id / (m+1), id % (m+1)};
-}
+const int MAX_K = 2100000; // number of holes +  starting points
+vector<Edge> graph[MAX_K],
+             invGraph[MAX_K];
+vector<int> dist(MAX_K, -1);
+vector<int> platformStart,
+            platformEnd;
 
-void mergeHoles(int platformId, vector<int> *lastHoles, vector<int> *currentHoles)
+int holesCount = 0;
+
+void mergeHoles(int platformId, vector<pii> &currentHoles, vector<pii> &lastHoles)
 {
-  int lastNode = node_to_id(platformId, 1); // begin with leftmost node
+  int lastNode = platformStart[platformId]; // start from the beginning 
   int lastIt = 0,                           // last platform holes iterator
-      currIt = 0,                           // current platform holes iterator
-      nextVal;
+      currIt = 0;                            // current platform holes iterator
+  pii nextVal;
   bool fromCurrent;
-  // cout << "platform " << platformId << "\n";
-  for (int i = 0; i < lastHoles->size() + currentHoles->size(); i++)
+  for (int i = 0; i < lastHoles.size() + currentHoles.size(); i++)
   {
-    if ((lastIt == lastHoles->size()) || (currIt < currentHoles->size() && currentHoles->at(currIt) < lastHoles->at(lastIt)))
+    // choose next smaller value from two arrays using second value
+    if ((lastIt == lastHoles.size()) || (currIt < currentHoles.size() && currentHoles[currIt].second < lastHoles[lastIt].second))
     {
-      nextVal = currentHoles->at(currIt);
+      nextVal = currentHoles[currIt];
       fromCurrent = true;
       currIt++;
     }
     else
     {
-      nextVal = lastHoles->at(lastIt);
+      nextVal = lastHoles[lastIt];
       fromCurrent = false;
       lastIt++;
     }
-    // cout << "next val:" << nextVal << "\n";
     // Add next node
     if (fromCurrent) // hole on current platform
     {
-      int afterHole = node_to_id(platformId, nextVal + 1); // node after hole
-      int belowHole = node_to_id(platformId + 1, nextVal); // node after hole
-      g[lastNode].push_back({afterHole, 1});
-      g[lastNode].push_back({belowHole, 0});
+      int afterHole = nextVal.first;
+      graph[lastNode].push_back({afterHole, 1}); // jump over with cost 1
       lastNode = afterHole;
     }
     else // hole is in celling of current platform
     {
-      int upperAfterHole = node_to_id(platformId - 1, nextVal + 1);
-      int underHole = node_to_id(platformId, nextVal);
-      g[lastNode].push_back({upperAfterHole, 1});
-      if (lastNode != underHole)
-      {
-        g[lastNode].push_back({underHole, 0});
-      }
-      lastNode = underHole;
+      int afterHole = nextVal.first;
+      int beforeHole = afterHole - 1;
+      graph[lastNode].push_back({afterHole, 1}); // jump on with cost 1
+      graph[beforeHole].push_back({lastNode, 0}); // jump off with cost 0
     }
   }
-  if (id_to_node(lastNode).second != m)
-  {
-    int finalNode = node_to_id(platformId, m);
-    g[lastNode].push_back({finalNode, 0});
-  }
+  platformEnd[platformId] = lastNode;
 }
 
 void zero_one_bfs()
 {
   deque<int> q;
-  for (int i = 1; i <= n; i++)
+  for (int i = 0; i < n; i++)
   {
-    auto node = node_to_id(i, m);
+    auto node = platformEnd[i];
     q.push_back(node);
     dist[node] = 0;
   }
-  // cout << "q size " << q.size() << "\n";
-  // unordered_set<pair<int, int>, hash_pair> visited;
   while (!q.empty())
   {
-    int current = q.front();
+    auto current = q.front();
     q.pop_front();
-
-    // visited.insert(current);
-    // cout <<  "current " << current.first << " " << current.second << "\n";
-    // cout << "curr dist: " << dist[current] << "\n";
-    for (pii edge : inv_g[current])
+    for (auto edge : invGraph[current])
     {
-      // if(visited.find(edge.target) != visited.end()){
-      //   continue;
-      // }
-      if (dist.find(edge.first) == dist.end() || dist[current] + edge.second < dist[edge.first])
+      if (dist[edge.target] == -1 || dist[current] + edge.weight < dist[edge.target])
       {
-
-        dist[edge.first] = dist[current] + edge.second;
-        if (edge.second == 0)
+        dist[edge.target] = dist[current] + edge.weight;
+        if (edge.weight == 0)
         {
-          q.push_front(edge.first);
+          q.push_front(edge.target);
         }
         else
         {
-          q.push_back(edge.first);
+          q.push_back(edge.target);
         }
       }
     }
@@ -142,42 +97,55 @@ void zero_one_bfs()
 int main(int argc, char const *argv[])
 {
   cin >> n >> m >> z;
-  vector<int> *lastHoles = new vector<int>;
-  vector<int> *currentHoles;
-  for (int platform = 1; platform <= n; platform++)
+  platformStart.resize(n);
+  platformEnd.resize(n);
+  vector<pii> holes1;
+  vector<pii> holes2;
+  bool loadToHoles1 = true;
+  for (int platform = 0; platform < n; platform++)
   {
     int k, hole;
     cin >> k;
-    currentHoles = new vector<int>(k);
+    platformStart[platform] = holesCount++;
     for (int j = 0; j < k; j++)
     {
       cin >> hole;
-      (*currentHoles)[j] = hole;
+      if (loadToHoles1)
+      {
+        holes1.push_back({holesCount++, hole}); // assign id with holesCount
+      }
+      else
+      {
+        holes2.push_back({holesCount++, hole}); // assign id with holesCount
+      }
     }
-    mergeHoles(platform, lastHoles, currentHoles);
-    lastHoles->clear();
-    delete lastHoles;
-    lastHoles = currentHoles;
-  }
-  delete currentHoles;
-  for (auto el : g)
-  {
-    for (pii node : el.second)
+    if (loadToHoles1)
     {
-      // cout << "from " << el.first.first << "," << el.first.second << " to " << node.target.first << ", " << node.target.second << " w: " << node.weight << "\n";
-      inv_g[node.first].push_back({el.first, node.second});
+      mergeHoles(platform, holes1, holes2);
+      holes2.clear();
+    }
+    else
+    {
+      mergeHoles(platform, holes2, holes1);
+      holes1.clear();
+    }
+    platformEnd[platform] = holesCount - 1;
+    loadToHoles1 = !loadToHoles1;
+  }
+  for (int i = 0; i < holesCount; i++)
+  {
+    for (auto el : graph[i])
+    {
+      invGraph[el.target].push_back({i, el.weight});
     }
   }
-  g.clear();
-
   zero_one_bfs();
-
   for (int i = 0; i < z; i++)
   {
     int platform;
     cin >> platform;
-    cout << dist[node_to_id(platform, 1)] << "\n";
+    platform--;
+    cout << dist[platformStart[platform]] << "\n";
   }
-
   return 0;
 }
