@@ -1,6 +1,5 @@
 #include <vector>
 #include <iostream>
-#include <tuple>
 #include <deque>
 #include <set>
 #include <cmath>
@@ -20,11 +19,6 @@ struct Change
     int edgeId, previousMascot, nextMascot;
 };
 
-struct DfsMove
-{
-    int nodeId, enter;
-};
-
 const int MAX_N = 100010,
           MAX_M = 150010,
           MAX_Z = 150010;
@@ -42,16 +36,14 @@ int preorder[MAX_N];
 int parent[MAX_N];
 int preorderCounter = 0;
 int dfsCounter = 0;
-DfsMove dfsOrder[MAX_N * 2];
+int dfsOrder[MAX_N * 2];
 pii edges[MAX_N];
-set<int> visitedNodes;
 int childNodeIdToEdgeId[MAX_N];
 bool wasNodeVisited[MAX_N];
 float sqrtN;
 
 void stateAdd(int x)
 {
-    // cout << "state add " << x << "\n";
     if (state[x] == 0)
     {
         stateSize++;
@@ -61,7 +53,6 @@ void stateAdd(int x)
 
 void stateDel(int x)
 {
-    // cout << "state del " << x << "\n";
     state[x]--;
     if (state[x] == 0)
     {
@@ -84,8 +75,7 @@ int getChild(pii &edge)
 
 void dfs(int startNode)
 {
-    // cout << "startNode in dfs" << startNode << "\n";
-    dfsOrder[dfsCounter++] = {startNode, true};
+    dfsOrder[dfsCounter++] = startNode;
     for (int edgeId : tree[startNode])
     {
         pii edge = edges[edgeId];
@@ -98,7 +88,7 @@ void dfs(int startNode)
         }
     }
     preorderCounter++;
-    dfsOrder[dfsCounter++] = {startNode, false};
+    dfsOrder[dfsCounter++] = startNode;
 }
 
 void calulateChildNodeIdToEdgeId()
@@ -113,34 +103,26 @@ void calulateChildNodeIdToEdgeId()
 
 int addEdge(int nodeId)
 {
-    // cout << "addEgde(" << nodeId <<")\n";
     int edgeId = childNodeIdToEdgeId[nodeId];
-    // cout << "edge Id " << edgeId << "\n";
     int mascot = edgeContent[edgeId];
     stateAdd(mascot);
-    // cout << "add mascot:" << mascot << "\n";
-    wasNodeVisited[nodeId] =  true;
-    // cout << "new current node" << nodeId << "\n";
+    wasNodeVisited[nodeId] = true;
     return nodeId;
 }
 
 int delEdge(int lastNodeId)
 {
-    // cout << "delEgde(" << lastNodeId <<")\n";
     int edgeId = childNodeIdToEdgeId[lastNodeId];
-    // cout << "edge Id " << edgeId << "\n";
     int mascot = edgeContent[edgeId];
     stateDel(mascot);
-    // cout << "del mascot:" << mascot << "\n";
     wasNodeVisited[lastNodeId] = false;
-    // cout << "new current node " << parent[lastNodeId] << "\n";
     return parent[lastNodeId];
 }
 
 bool compareQueries(const int &lhs, const int &rhs)
 {
-    pii a = make_pair((int)floor(queries[lhs].time / sqrtN), queries[lhs].nodeId);
-    pii b = make_pair((int)floor(queries[rhs].time / sqrtN), queries[rhs].nodeId);
+    pii a = make_pair((int)floor((float)(queries[lhs].time + 1) / sqrtN), preorder[queries[lhs].nodeId]);
+    pii b = make_pair((int)floor((float)(queries[rhs].time + 1) / sqrtN), preorder[queries[rhs].nodeId]);
     return a < b;
 }
 
@@ -163,25 +145,6 @@ int main(int argc, char const *argv[])
     dfs(0);
     childNodeIdToEdgeId[0] = -1;
     calulateChildNodeIdToEdgeId();
-    // cout << "parent ";
-    // for (int i = 0; i < n; i++)
-    // {
-    //     cout << parent[i] << " ";
-    // }
-    // cout << "\n";
-    // cout << "preorder ";
-    // for (int i = 0; i < n; i++)
-    // {
-    //     cout << preorder[i] << " ";
-    // }
-    // cout << "\n";
-
-    // cout << "dfs order ";
-    // for (int i = 0; i < dfsOrder.size(); i++)
-    // {
-    //     cout << " (" << ((dfsOrder[i].enter) ? 't' : 'f') << " " << dfsOrder[i].nodeId << ")";
-    // }
-    // cout << "\n";
 
     // read queries
     int time = 0;
@@ -189,7 +152,6 @@ int main(int argc, char const *argv[])
     {
         char type;
         cin >> type;
-        // cout << "type " << type << "\n";
         switch (type)
         {
         case 'Z':
@@ -216,7 +178,7 @@ int main(int argc, char const *argv[])
     {
         queriesOrder[i] = i;
     }
-    sort(queriesOrder.begin(), queriesOrder.end(), compareQueries);
+    stable_sort(queriesOrder.begin(), queriesOrder.end(), compareQueries);
 
     int currentTime = time;
     int currentDfsStage = 0; // start when root already added
@@ -226,54 +188,33 @@ int main(int argc, char const *argv[])
     for (auto queryId : queriesOrder)
     {
         auto query = queries[queryId];
-        // cout << "q.time " << query.time << " q.nodeId " << query.nodeId << " currentTime:" << currentTime << " currentNode:" << currentNode << "\n";
-        // cout << "edgesContent ";
-        // for (int i = 0; i < n - 1; i++)
-        // {
-        //     cout << edgeContent[i] << " ";
-        // }
-        // cout << "\n";
-
-        // cout << "child to edge id ";
-        // for (int i = 0; i < n; i++)
-        // {
-        //     cout << childNodeIdToEdgeId[i] << " ";
-        // }
-        // cout << "\n";
         while (currentDfsStage < preorder[query.nodeId])
         {
-            DfsMove nextDfsMove = dfsOrder[++currentDfsStage];
-            // cout << "dfs move " << ((nextDfsMove.enter) ? "true" : "false") << " " << nextDfsMove.nodeId << "\n";
-            if (nextDfsMove.enter)
+            int nextVisitedNode = dfsOrder[++currentDfsStage];
+            if (!wasNodeVisited[nextVisitedNode])
             { // add edge and its content
-                currentNode = addEdge(nextDfsMove.nodeId);
+                currentNode = addEdge(nextVisitedNode);
             }
             else
             {
                 currentNode = delEdge(currentNode);
             }
-            // visitedNodes.clear();
-            // currentNode = 0;
-            // currentDfsStage = 0;
-            // clearState();
         }
         while (currentDfsStage > preorder[query.nodeId])
         {
-            DfsMove nextDfsMove = dfsOrder[currentDfsStage--];
-            // cout << "reverse dfs move currentDfsStage:" << currentDfsStage << " " << ((nextDfsMove.enter) ? "true" : "false") << " " << nextDfsMove.nodeId << "\n";
-            if (nextDfsMove.enter)
+            int nextVisitedNode = dfsOrder[currentDfsStage--];
+            if (wasNodeVisited[nextVisitedNode])
             { // remove edge and its content
                 currentNode = delEdge(currentNode);
             }
             else
             {
-                currentNode = addEdge(nextDfsMove.nodeId);
+                currentNode = addEdge(nextVisitedNode);
             }
         }
         while (currentTime < query.time)
         { // forward in time
             auto change = changes[currentTime++];
-            // cout << "forward in time edge:" << change.edgeId << " " << change.previusMascot << " -> " << change.nextMascot << "\n";
             int mascot = edgeContent[change.edgeId];
             pii edge = edges[change.edgeId];
             int edgeChild = getChild(edge);
@@ -287,7 +228,6 @@ int main(int argc, char const *argv[])
         while (currentTime > query.time)
         { // back in time
             auto change = changes[--currentTime];
-            // cout << "back in time edge:" << change.edgeId << " " << change.previusMascot << " -> " << change.nextMascot << "\n";
             int mascot = edgeContent[change.edgeId];
             pii edge = edges[change.edgeId];
             int edgeChild = getChild(edge);
@@ -299,7 +239,6 @@ int main(int argc, char const *argv[])
             edgeContent[change.edgeId] = change.previousMascot;
         }
 
-        // cout << "stateSize" << stateSize << "\n";
         answers[queryId] = stateSize;
     }
     for (auto ans : answers)
