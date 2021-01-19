@@ -7,50 +7,52 @@ def read_ints():
     return list(map(int, input().split(" ")))
 
 
-class State:
-    def __init__(self, n: int):
-        self.size = 0
-        self._state = [0] * n
+MAX_N = 100010
+MAX_M = 150010
+MAX_Z = 150010
 
-    def add(self, x: int):
-        if self._state[x] == 0:
-            self.size += 1
-        self._state[x] += 1
+state = defaultdict(int)
 
-    def delete(self, x: int):
-        self._state[x] -= 1
-        if self._state[x] == 0:
-            self.size -= 1
-
-
-counter = 0
+visited: List[bool] = [False] * MAX_N
+child_node_id_to_edge_id = [-1] * MAX_N
 tree = defaultdict(list)
-dfs_order: List[Tuple[int, bool]] = []
-preorder: List[Optional[int]]
-parent: List[int]
+dfs_order: List[int] = [-1] * (2 * MAX_N)
+preorder: List[Optional[int]] = [-1] * MAX_N
+parent: List[int] = [-1] * MAX_N
+edges: List[Tuple[int, int]] = []
+edges_content: List[int] = [-1] * MAX_N
 
 
-def get_edge(current_node, next_node) -> Tuple[int, int]:
-    return (next_node, current_node) if next_node < current_node else (current_node, next_node)
-
-
-def dfs(start_node: int):  # we need iterative version as recursive version throws RecursionError :<
-    global counter, dfs_order
+def dfs(start_node: int):
+    """
+    We need iterative version as recursive version throws RecursionError :<
+    """
+    counter = 0
     q = deque([start_node])
     while len(q) != 0:
         node = q.popleft()
         if preorder[node] == -1:  # not visited
             q.appendleft(node)  # add again to calculate exit time
-            dfs_order[counter] = (node, True)  # enter node
+            dfs_order[counter] = node  # enter node
             preorder[node] = counter  # store preorder
             counter += 1
             for neighbour in tree[node]:
-                if preorder[neighbour] == -1:  # not visited yet
+                if preorder[neighbour] == -1:  # not visited yet and not root
                     parent[neighbour] = node  # mark parent
                     q.appendleft(neighbour)
         else:
-            dfs_order[counter] = (node, False)  # exit node
+            dfs_order[counter] = node  # exit node
             counter += 1
+
+
+def get_child(edge: Tuple[int, int]):
+    return edge[0] if (parent[edge[0]] == edge[1]) else edge[1]
+
+
+def calculate_child_node_id_to_end_id():
+    for edge_id, edge in enumerate(edges):
+        child = get_child(edge)
+        child_node_id_to_edge_id[child] = edge_id
 
 
 def edge_in_path(edge: Tuple[int, int], path: Set[int]) -> bool:
@@ -59,106 +61,102 @@ def edge_in_path(edge: Tuple[int, int], path: Set[int]) -> bool:
 
 def main():
     n, m, z = read_ints()
-    state = State(m)
-    edges = {}
-    edges_content = {}
     # read tree structure
     for i in range(n - 1):
         edge_from, edge_to, mascot = read_ints()
         edge_from, edge_to = edge_from - 1, edge_to - 1  # decrease
-        edge = get_edge(edge_from, edge_to)
-        edges[i] = edge
-        edges_content[edge] = mascot - 1  # decrease for zero-based indexing
+        edges.append((edge_from, edge_to))
+        edges_content[i] = mascot - 1  # decrease for zero-based indexing
         tree[edge_from].append(edge_to)
         tree[edge_to].append(edge_from)
+
+    # process tree
+    dfs(0)
+    calculate_child_node_id_to_end_id()
+
+    # read queries and changes
     queries: List[Tuple[int, int]] = []
     changes: List[Tuple[int, int, int]] = []
-    # read queries
+
     time = 0
     for i in range(z):
         query = input().split(" ")
         if query[0] == 'Z':  # query
             node = int(query[1]) - 1  # decrease for zero-based indexing
             queries.append((time, node))
-        else:  # q[0] == 'B' change mascot on edge
-            time += 1
+        else:  # 'B' change mascot on edge
             edge_id, next_mascot = map(lambda x: int(x) - 1, query[1:])  # decrease for zero-based indexing
-            edge = edges[edge_id]
-            current_mascot = edges_content[edge]
+            current_mascot = edges_content[edge_id]
             changes.append((edge_id, current_mascot, next_mascot))
-            edges_content[edge] = next_mascot
+            edges_content[edge_id] = next_mascot
+            time += 1
 
-    # init arrays
-    global preorder, parent, dfs_order
-    preorder = [-1] * n
-    parent = [0] * n
-    parent[0] = 0
-    dfs_order = [(-1, False)] * (2 * n)  # 0(2n) memory, we can afford it, but we need to preallocate it
-    # assign node ids, determine parent
-    dfs(0)
+    def add_node_to_path(node_id: int):
+        edge_id = child_node_id_to_edge_id[node_id]
+        mascot = edges_content[edge_id]
+        state[mascot] += 1
+        visited[node_id] = True
+        return node_id
+
+    def remove_node_from_path(node_id: int):
+        edge_id = child_node_id_to_edge_id[node_id]
+        mascot = edges_content[edge_id]
+        state[mascot] -= 1
+        if state[mascot] == 0:
+            state.pop(mascot)
+        visited[node_id] = False
+        return parent[node_id]
+
+    # sort queries
+    sqrt_n = sqrt(n)
+    ordered_queries = sorted(range(len(queries)),
+                             key=lambda q: (floor(queries[q][0] / sqrt_n), preorder[queries[q][1]]))
 
     # move through (t,v) space
     current_t = time  # current tree state is same as in finish time
     current_v = 0  # current dfs order, 1 root is already added
     current_node = 0  # current node, 0 because we start from root
-    current_path = {0}  # current path, only 0 because we start from root
-
-    def add_node_to_path(node_to_add: int):
-        nonlocal current_node
-        edge = get_edge(node_to_add, current_node)
-        mascot_to_add = edges_content[edge]
-        state.add(mascot_to_add)
-        current_path.add(node_to_add)
-        current_node = node_to_add
-
-    def remove_last_node_from_path():
-        nonlocal current_node
-        edge = get_edge(current_node, parent[current_node])
-        mascot_to_del = edges_content[edge]
-        state.delete(mascot_to_del)
-        current_path.remove(current_node)
-        current_node = parent[current_node]
-
-    # sort queries
-    sqrt_n = sqrt(n)
-    # as current tree state is in last time stamp, we will sort by -t/sqrt_n
-    ordered_queries = map(lambda x: x[2], sorted((-floor(q_t / sqrt_n), q_v, q_idx)
-                                                 for q_idx, (q_t, q_v) in enumerate(queries)))
 
     answers: List[int] = [0] * len(queries)  # init answers array as result will be calculated out of order
     for q_idx in ordered_queries:
-        qt, qv = queries[q_idx]
-        while current_t < qt:  # shift state to future time
+        q_time, q_node = queries[q_idx]
+        while current_v < preorder[q_node]:  # need to move dfs forward
+            next_node = dfs_order[current_v + 1]  # node id, added/removed
+            if not visited[next_node]:  # go down the tree
+                current_node = add_node_to_path(next_node)
+            else:  # return to node's parent
+                current_node = remove_node_from_path(current_node)
+            current_v += 1
+        while current_v > preorder[q_node]:  # need to revert dfs
+            last_node = dfs_order[current_v]  # node id, added/removed
+            if visited[last_node]:  # last node was added, so to reverse it we have to remove it
+                current_node = remove_node_from_path(current_node)
+            else:
+                current_node = add_node_to_path(last_node)
+            current_v -= 1
+        while current_t < q_time:  # shift state to future time
             edge_id, prev_mascot, next_mascot = changes[current_t]  # change mascot prev -> next on edge
             edge = edges[edge_id]
-            if edge_in_path(edge, current_path):  # update state if change is in current path
-                state.delete(prev_mascot)
-                state.add(next_mascot)
-            edges_content[edge] = next_mascot
+            child = get_child(edge)
+            if visited[child]:  # update state if change is in current path
+                state[prev_mascot] -= 1
+                if state[prev_mascot] == 0:
+                    state.pop(prev_mascot)
+                state[next_mascot] += 1
+            edges_content[edge_id] = next_mascot
             current_t += 1
-        while current_t > qt:  # shift state to past time
+        while current_t > q_time:  # shift state to past time
             edge_id, prev_mascot, next_mascot = changes[current_t - 1]  # change mascot next -> prev on edge
             edge = edges[edge_id]
-            if edge_in_path(edge, current_path):  # update state if change is in current path
-                state.delete(next_mascot)
-                state.add(prev_mascot)
-            edges_content[edge] = prev_mascot
+            child = get_child(edge)
+            if visited[child]:  # update state if change is in current path
+                state[next_mascot] -= 1
+                if state[next_mascot] == 0:
+                    state.pop(next_mascot)
+                state[prev_mascot] += 1
+            edges_content[edge_id] = prev_mascot
             current_t -= 1
-        while current_v < preorder[qv]:  # need to move dfs forward
-            next_node, next_operation = dfs_order[current_v + 1]  # node id, added/removed
-            if next_operation:  # go down the tree
-                add_node_to_path(next_node)
-            else:  # return to node's parent
-                remove_last_node_from_path()
-            current_v += 1
-        while current_v > preorder[qv]:  # need to revert dfs
-            last_node, last_operation = dfs_order[current_v]  # node id, added/removed
-            if last_operation:  # last node was added, so to reverse it we have to remove it
-                remove_last_node_from_path()
-            else:
-                add_node_to_path(last_node)
-            current_v -= 1
-        answers[q_idx] = state.size  # store number of distinct mascots in path
+        answers[q_idx] = len(state)  # store number of distinct mascots in path
     for answer in answers:
         print(answer)
 
