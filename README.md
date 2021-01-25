@@ -1,4 +1,4 @@
-# XXVIII Polish Olimpics Solutions / Rozwiązania XXVIII Olipiady Informatycznej
+# XXVIII Polish Olympiad in Informatics Solutions / Rozwiązania XXVIII Olipiady Informatycznej
 
 Problems:
 * [cuk - The Bakery / Cukiernia](https://szkopul.edu.pl/problemset/problem/rr3lU0T8pNn2mAbL07wBTZT3/site/)
