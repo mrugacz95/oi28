@@ -1,8 +1,6 @@
 import itertools
-import timeit
-from heapq import nlargest, nsmallest
-from random import randint, shuffle
-from typing import List, Tuple
+from heapq import nsmallest
+from typing import List
 
 
 def main():
