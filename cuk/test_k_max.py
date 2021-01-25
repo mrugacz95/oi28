@@ -1,7 +1,7 @@
 import timeit
 from heapq import nlargest
 from random import randint, shuffle
-from typing import List, Tuple
+from typing import List
 
 
 def k_max_heap(arr: List[int], k: int):
@@ -60,5 +60,6 @@ def test_k_max_times():
     print(f"sort time: {t}")
     t = timeit.timeit(lambda: k_max_choose(a, k), number=1000)
     print(f"k max choice time: {t}")
+
 
 test_k_max_times()
