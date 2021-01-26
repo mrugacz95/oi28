@@ -31,6 +31,7 @@ void calcSum(int toIndex)
 int main(int argc, char const *argv[])
 {
     ios::sync_with_stdio(false);
+    cin.tie(NULL);
     cin >> n >> z;
     cin >> a[0] >> a[1];
     int seg = ceil(n / (float)numberOfZeros);
